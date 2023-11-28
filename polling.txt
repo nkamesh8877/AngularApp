@@ -1,0 +1,43 @@
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { interval, Observable, Subject } from 'rxjs';
+import { startWith, switchMap, takeUntil } from 'rxjs/operators';
+
+@Injectable()
+export class PatientPollingService {
+  private pollingInterval: any;
+  private patientData: any[];
+  private pollingUrl: string = 'http://localhost:3000/patients'; // Change this URL to your endpoint
+
+  constructor(private http: HttpClient, private snackBar: MatSnackBar) {
+    this.patientData = [];
+  }
+
+  private retrievePatientData(): Observable<any[]> {
+    return this.http.get<any[]>(this.pollingUrl);
+  }
+
+  public startPolling(destroy$: Subject<boolean>) {
+    this.pollingInterval = interval(30000)
+      .pipe(takeUntil(destroy$))
+      .pipe(startWith(0), switchMap(() => this.retrievePatientData()))
+      .subscribe((data: any[]) => {
+        if (this.isDataUpdated(data)) {
+          this.patientData = data;
+          this.showNotification('Patient data updated!');
+        }
+      });
+  }
+
+  private isDataUpdated(newData: any[]): boolean {
+    const isEqual = JSON.stringify(this.patientData) === JSON.stringify(newData);
+    return !isEqual;
+  }
+
+  private showNotification(message: string) {
+    this.snackBar.open(message, 'Close', {
+      duration: 3000,
+    });
+  }
+}
