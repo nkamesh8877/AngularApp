@@ -1,0 +1,81 @@
+// longpolling.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { Subject } from 'rxjs';
+import { catchError, retryWhen, delay, takeUntil } from 'rxjs/operators';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class LongPollingService {
+  pollingUrl: string = 'http://localhost:3000/patients';
+  private destroy$: Subject<boolean> = new Subject<boolean>();
+
+  constructor(private http: HttpClient, private snackBar: MatSnackBar) {}
+
+  public startLongPolling() {
+    this.pollData();
+  }
+
+  private pollData() {
+    this.http.get(this.pollingUrl)
+      .pipe(
+        retryWhen(errors =>
+          errors.pipe(
+            delay(5000) // Delay between consecutive polling attempts
+          )
+        ),
+        takeUntil(this.destroy$)
+      )
+      .subscribe((data: any[]) => {
+        this.showNotification('Patient data updated!');
+        // Handle the received data here
+        // For example, update a component property with the new data
+      },
+      (error) => {
+        // Handle any errors here
+        console.error('Error occurred:', error);
+      });
+  }
+
+  private showNotification(message: string) {
+    this.snackBar.open(message, 'Close', {
+      duration: 3000,
+    });
+  }
+
+  public stopLongPolling() {
+    this.destroy$.next(true);
+    this.destroy$.complete();
+  }
+}
+
+
+
+
+
+// longpolling.component.ts
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { LongPollingService } from '../services/longpolling.service';
+
+@Component({
+  selector: 'app-longpolling',
+  templateUrl: './longpolling.component.html',
+  styleUrls: ['./longpolling.component.css']
+})
+export class LongPollingComponent implements OnInit, OnDestroy {
+  constructor(private longPollingService: LongPollingService) {}
+
+  ngOnInit(): void {
+    this.longPollingService.startLongPolling();
+  }
+
+  ngOnDestroy(): void {
+    this.longPollingService.stopLongPolling();
+  }
+}
+
+
+
+
