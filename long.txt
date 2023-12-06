@@ -2,8 +2,8 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Subject } from 'rxjs';
-import { catchError, retryWhen, delay, takeUntil } from 'rxjs/operators';
+import { Subject, timer } from 'rxjs';
+import { switchMap, takeUntil, retryWhen, delay } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -19,24 +19,23 @@ export class LongPollingService {
   }
 
   private pollData() {
-    this.http.get(this.pollingUrl)
+    timer(0, 5000) // Poll every 5 seconds
       .pipe(
-        retryWhen(errors =>
-          errors.pipe(
-            delay(5000) // Delay between consecutive polling attempts
-          )
-        ),
-        takeUntil(this.destroy$)
+        takeUntil(this.destroy$),
+        switchMap(() => this.http.get(this.pollingUrl)),
+        retryWhen((errors) => errors.pipe(delay(5000))) // Retry after a delay if there's an error
       )
-      .subscribe((data: any[]) => {
-        this.showNotification('Patient data updated!');
-        // Handle the received data here
-        // For example, update a component property with the new data
-      },
-      (error) => {
-        // Handle any errors here
-        console.error('Error occurred:', error);
-      });
+      .subscribe(
+        (data: any[]) => {
+          this.showNotification('Patient data updated!');
+          // Handle the received data here
+          // For example, update a component property with the new data
+        },
+        (error) => {
+          // Handle any errors here
+          console.error('Error occurred:', error);
+        }
+      );
   }
 
   private showNotification(message: string) {
@@ -50,9 +49,6 @@ export class LongPollingService {
     this.destroy$.complete();
   }
 }
-
-
-
 
 
 // longpolling.component.ts
